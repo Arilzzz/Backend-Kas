@@ -45,6 +45,16 @@ class PengeluaranKasController extends Controller
             return response()->json($validator->errors(), 422);
         }
 
+        $totalPemasukkan = \App\Models\PembayaranKas::sum('jumlah_pemasukkan');
+        $totalPengeluaran = PengeluaranKas::sum('jumlah_pengeluaran');
+        $saldo = $totalPemasukkan - $totalPengeluaran;
+
+        if ($request->jumlah_pengeluaran > $saldo) {
+            return response()->json([
+                'message' => 'Saldo kas tidak mencukupi untuk pengeluaran ini.'
+            ], 422);
+        }
+
         $path = null;
 
         if ($request->hasFile('bukti_foto')) {

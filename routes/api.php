@@ -13,24 +13,24 @@ Route::get('/user', function (Request $request) {
 
 
 // Routes accessible by both Admin and Student
-// Route::middleware(['auth:sanctum', 'role:admin,student'])->group(function () {
-//     Route::apiResource('/pembayaran', PembayaranKasController::class);
-//     Route::apiResource('/pengeluaran', PengeluaranKasController::class);
-//     Route::apiResource('/student', DataStudentController::class);
-//     Route::post('/logout', [AuthController::class, 'logout']);
-// });
+Route::middleware(['auth:sanctum', 'role:admin,student'])->group(function () {
+    Route::apiResource('/pembayaran', PembayaranKasController::class);
+    Route::apiResource('/pengeluaran', PengeluaranKasController::class);
+    Route::apiResource('/student', DataStudentController::class);
+    Route::post('/logout', [AuthController::class, 'logout']);
+});
 
-// // Routes accessible only by Admin
-// Route::middleware(['auth:sanctum', 'role:admin'])->group(function () {
-//     Route::apiResource('/pembayaran', PembayaranKasController::class)->except(['index', 'show']);
-//     Route::apiResource('/pengeluaran', PengeluaranKasController::class)->except(['index', 'show']);
-//     Route::apiResource('/student', DataStudentController::class)->except(['index', 'show']);
-//     Route::post('/logout', [AuthController::class, 'logout']);
-// });
+// Routes accessible only by Admin
+Route::middleware(['auth:sanctum', 'role:admin'])->group(function () {
+    Route::apiResource('/pembayaran', PembayaranKasController::class)->except(['index', 'show']);
+    Route::apiResource('/pengeluaran', PengeluaranKasController::class)->except(['index', 'show']);
+    Route::apiResource('/student', DataStudentController::class)->except(['index', 'show']);
+    Route::post('/logout', [AuthController::class, 'logout']);
+});
 
-Route::apiResource('/student', DataStudentController::class);
-Route::apiResource('/pembayaran', PembayaranKasController::class);
-Route::apiResource('/pengeluaran', PengeluaranKasController::class);
+// Route::apiResource('/student', DataStudentController::class);
+// Route::apiResource('/pembayaran', PembayaranKasController::class);
+// Route::apiResource('/pengeluaran', PengeluaranKasController::class);
 
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login-Admin', [AuthController::class, 'loginAdmin']);
