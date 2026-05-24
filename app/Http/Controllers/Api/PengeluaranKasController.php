@@ -106,7 +106,7 @@ class PengeluaranKasController extends Controller
             'tanggal_pengeluaran' => 'required|date',
             'jumlah_pengeluaran' => 'required|integer',
             'keterangan' => 'required|string',
-            'bukti_foto' => 'required|image|mimes:jpg,jpeg,png|max:2048'
+            'bukti_foto' => 'nullable|image|mimes:jpg,jpeg,png|max:2048'
         ]);
 
         if ($validator->fails()) {
@@ -117,6 +117,22 @@ class PengeluaranKasController extends Controller
         if(!$pengeluaran) return response()->json([
             'message' => 'Data tidak ditemukan'
         ], 404);
+
+        $data = [
+            'tanggal_pengeluaran' => $request->tanggal_pengeluaran,
+            'jumlah_pengeluaran' => $request->jumlah_pengeluaran,
+            'keterangan' => $request->keterangan,
+        ];
+
+        if ($request->hasFile('bukti_foto')) {
+            $file = $request->file('bukti_foto');
+            $filename = time() . '_' . $file->getClientOriginalName();
+            $path = $file->storeAs('bukti', $filename, 'public');
+            $data['bukti_foto'] = $path;
+ }       
+
+        $pengeluaran->update($data);
+
         return response()->json([
             'success' => true,
             'Data' => $pengeluaran
