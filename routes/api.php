@@ -11,7 +11,6 @@ Route::get('/user', function (Request $request) {
     return $request->user();
 })->middleware('auth:sanctum');
 
-
 // Routes accessible by both Admin and Student
 Route::middleware(['auth:sanctum', 'role:admin,student'])->group(function () {
     Route::apiResource('/pembayaran', PembayaranKasController::class);
@@ -22,6 +21,7 @@ Route::middleware(['auth:sanctum', 'role:admin,student'])->group(function () {
 
 // Routes accessible only by Admin
 Route::middleware(['auth:sanctum', 'role:admin'])->group(function () {
+    Route::post('/student/import', [DataStudentController::class, 'importCSV']);
     Route::apiResource('/pembayaran', PembayaranKasController::class)->except(['index', 'show']);
     Route::apiResource('/pengeluaran', PengeluaranKasController::class)->except(['index', 'show']);
     Route::apiResource('/student', DataStudentController::class)->except(['index', 'show']);
