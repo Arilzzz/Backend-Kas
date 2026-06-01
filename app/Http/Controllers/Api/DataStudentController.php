@@ -125,12 +125,17 @@ class DataStudentController extends Controller
     /**
      * Import students from CSV file.
      * Format: nis,nama_siswa
-     * Modes: "replace" (delete all old data, insert new) or "append" (add new, skip existing NIS)
+     * Modes: "replace" (delete all old data + payments, insert new) or "append" (add new, skip existing NIS)
+     *
+     * NOTE: MIME type validation is intentionally omitted because on Windows with
+     * Microsoft Excel installed, CSV files are frequently uploaded with MIME types
+     * such as "application/vnd.ms-excel" or "application/octet-stream" which do not
+     * match Laravel's "mimes:csv,txt" rule. Extension validation is used instead.
      */
     public function importCSV(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'file' => 'required|file|mimes:csv,txt|max:2048',
+            'file' => 'required|file|max:2048',
             'mode' => 'required|in:replace,append',
         ]);
 
@@ -145,34 +150,46 @@ class DataStudentController extends Controller
         $file = $request->file('file');
         $mode = $request->input('mode');
 
+        // Validate by extension — MIME types are unreliable on Windows/Excel
+        $extension = strtolower($file->getClientOriginalExtension());
+        if (! in_array($extension, ['csv', 'txt'])) {
+            return response()->json([
+                'Success' => false,
+                'Message' => 'File harus berformat CSV (.csv atau .txt)',
+            ], 422);
+        }
+
         try {
-            $handle = fopen($file->getRealPath(), 'r');
-            if (! $handle) {
-                return response()->json([
-                    'Success' => false,
-                    'Message' => 'Gagal membaca file CSV',
-                ], 500);
-            }
+            // Read raw content and strip UTF-8 BOM (\xEF\xBB\xBF) that Excel adds
+            $content = file_get_contents($file->getRealPath());
+            $content = preg_replace('/^\xEF\xBB\xBF/', '', $content);
+            // Normalize all line endings to \n
+            $content = str_replace(["\r\n", "\r"], "\n", $content);
+
+            $lines = array_values(array_filter(
+                explode("\n", $content),
+                fn ($l) => trim($l) !== ''
+            ));
 
             $rows = [];
             $lineNumber = 0;
             $errors = [];
             $skipped = 0;
 
-            while (($data = fgetcsv($handle, 1000, ',')) !== false) {
+            foreach ($lines as $line) {
                 $lineNumber++;
+                $data = str_getcsv($line, ',', '"');
 
-                // Skip empty lines
-                if (empty(array_filter($data))) {
+                // Skip blank lines
+                if (empty(array_filter($data, fn ($v) => trim($v) !== ''))) {
                     continue;
                 }
 
-                // Skip header row (if first row contains non-numeric NIS)
-                if ($lineNumber === 1 && ! is_numeric(trim($data[0]))) {
+                // Skip header row if first column is non-numeric
+                if ($lineNumber === 1 && ! is_numeric(trim($data[0] ?? ''))) {
                     continue;
                 }
 
-                // Validate row has at least 2 columns
                 if (count($data) < 2) {
                     $errors[] = "Baris {$lineNumber}: Format tidak valid (butuh minimal 2 kolom)";
 
@@ -182,26 +199,20 @@ class DataStudentController extends Controller
                 $nis = trim($data[0]);
                 $nama_siswa = trim($data[1]);
 
-                // Validate NIS is numeric
                 if (! is_numeric($nis)) {
                     $errors[] = "Baris {$lineNumber}: NIS '{$nis}' harus berupa angka";
 
                     continue;
                 }
 
-                // Validate nama_siswa is not empty
                 if (empty($nama_siswa)) {
                     $errors[] = "Baris {$lineNumber}: Nama siswa tidak boleh kosong";
 
                     continue;
                 }
 
-                $rows[] = [
-                    'nis' => $nis,
-                    'nama_siswa' => $nama_siswa,
-                ];
+                $rows[] = ['nis' => $nis, 'nama_siswa' => $nama_siswa];
             }
-            fclose($handle);
 
             if (empty($rows)) {
                 return response()->json([
@@ -214,20 +225,12 @@ class DataStudentController extends Controller
             $imported = 0;
 
             if ($mode === 'replace') {
-                // Replace mode: delete all existing, insert all new
                 DB::transaction(function () use ($rows, &$imported) {
-                    // Temporarily disable foreign key checks to allow deleting
                     DB::statement('SET FOREIGN_KEY_CHECKS=0;');
-
-                    // Delete records from both tables to ensure a clean slate
                     DB::table('pembayaran_kas')->delete();
                     DB::table('data_students')->delete();
-
-                    // Reset auto-increment IDs
                     DB::statement('ALTER TABLE pembayaran_kas AUTO_INCREMENT = 1;');
                     DB::statement('ALTER TABLE data_students AUTO_INCREMENT = 1;');
-
-                    // Re-enable foreign key checks
                     DB::statement('SET FOREIGN_KEY_CHECKS=1;');
 
                     foreach ($rows as $row) {
@@ -239,10 +242,9 @@ class DataStudentController extends Controller
                     }
                 });
             } else {
-                // Append mode: insert new ones, skip if NIS already exists
+                // Append: insert new, skip existing NIS
                 foreach ($rows as $row) {
-                    $exists = DataStudent::where('nis', $row['nis'])->exists();
-                    if ($exists) {
+                    if (DataStudent::where('nis', $row['nis'])->exists()) {
                         $skipped++;
 
                         continue;

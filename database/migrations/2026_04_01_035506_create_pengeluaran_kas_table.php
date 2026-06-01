@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('pengeluaran_kas', function (Blueprint $table) {
             $table->id();
-            $table->dateTime('tanggal_pengeluaran');
+            $table->date('tanggal_pengeluaran');
             $table->integer('jumlah_pengeluaran');
             $table->text('keterangan')->nullable();
             $table->string('bukti_foto')->nullable(); // Path
