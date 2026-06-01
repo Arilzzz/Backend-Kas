@@ -216,12 +216,16 @@ class DataStudentController extends Controller
             if ($mode === 'replace') {
                 // Replace mode: delete all existing, insert all new
                 DB::transaction(function () use ($rows, &$imported) {
-                    // Temporarily disable foreign key checks to allow truncating
+                    // Temporarily disable foreign key checks to allow deleting
                     DB::statement('SET FOREIGN_KEY_CHECKS=0;');
 
-                    // Truncate both tables to ensure a clean slate and reset auto-increment IDs
-                    DB::table('pembayaran_kas')->truncate();
-                    DataStudent::truncate();
+                    // Delete records from both tables to ensure a clean slate
+                    DB::table('pembayaran_kas')->delete();
+                    DB::table('data_students')->delete();
+
+                    // Reset auto-increment IDs
+                    DB::statement('ALTER TABLE pembayaran_kas AUTO_INCREMENT = 1;');
+                    DB::statement('ALTER TABLE data_students AUTO_INCREMENT = 1;');
 
                     // Re-enable foreign key checks
                     DB::statement('SET FOREIGN_KEY_CHECKS=1;');
